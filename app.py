@@ -12,7 +12,8 @@ logger.add(f'log/{__name__}.log', format='{time} {level} {message}', level='DEBU
 urls = [
     'https://acqpc.bisys.ru/status?format=json',
     'https://mobile.ckassa.ru/status?format=json',
-    'https://acqpc.bisys.ru/status?format=json'
+    'https://acqpc.bisys.ru/status?format=json',
+    'https://autopays.ru/status?format=json'
 ]
 
 
@@ -29,7 +30,8 @@ def get_data_from_nginx(url):
 
 
 def get_finmonstate():
-    db_path = 'C:/Users/User/PycharmProjects/webhook_server/src/db.sqlite'
+    db_path = '/home/support/soft/webserver/src/db.sqlite'
+    #db_path = 'C:/Users/User/PycharmProjects/webhook_server/src/db.sqlite'
     conn = sqlite3.connect(db_path)  # Инициируем подключение к БД
     cursor = conn.cursor()
 
@@ -83,6 +85,6 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         logger.info('Program stopped')
     except Exception as e:
-        t_alarmtext = f'Crossout_helper (app.py):\n {str(e)}'
+        t_alarmtext = f'prometheus-custom-collector (app.py):\n {str(e)}'
         do_alarm(t_alarmtext)
         logger.error(f'Other except error Exception', exc_info=True)
