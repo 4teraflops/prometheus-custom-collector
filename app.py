@@ -30,8 +30,8 @@ def get_data_from_nginx(url):
 
 
 def get_finmonstate():
-    db_path = '/home/support/soft/webserver/src/db.sqlite'
-    #db_path = 'C:/Users/User/PycharmProjects/webhook_server/src/db.sqlite'
+    db_path = '/home/support/soft/webserver/src/db.sqlite'  # prom path
+    #db_path = 'C:/Users/User/PycharmProjects/webhook_server/src/db.sqlite'  # dev path
     conn = sqlite3.connect(db_path)  # Инициируем подключение к БД
     cursor = conn.cursor()
 
@@ -46,6 +46,22 @@ def get_finmonstate():
     return finmonstate
 
 
+def get_fiscalcount():
+    db_path = '/home/support/soft/webserver/src/db.sqlite'
+    #db_path = 'C:/Users/User/PycharmProjects/webhook_server/src/db.sqlite'
+    conn = sqlite3.connect(db_path)  # Инициируем подключение к БД
+    cursor = conn.cursor()
+
+    try:
+        fiscalcount = cursor.execute(
+            "SELECT count FROM fiscalization_states WHERE date_time = (SELECT max(date_time) FROM fiscalization_states WHERE date_time >= datetime('now', '+5 hours', '-3 hours'))"
+        ).fetchall()[0][0]
+    except IndexError:
+        fiscalcount = 0
+    conn.commit()
+    return fiscalcount
+
+
 @logger.catch()
 class CustomCollector(object):
     def __init__(self):
@@ -53,7 +69,7 @@ class CustomCollector(object):
 
     def collect(self):
         #  Все доступные аплинки
-        g = GaugeMetricFamily("nginx_upstreams", '1/0 = UP/DOWN', labels=['upstream', 'name'])
+        nginx_upstreams = GaugeMetricFamily("nginx_upstreams", '1/0 = UP/DOWN', labels=['upstream', 'name'])
         for url in urls:  # Итерация по списку урлов
             request = get_data_from_nginx(url)
             # logger.info(f'url: {url}\nrequest: {request}')
@@ -65,15 +81,20 @@ class CustomCollector(object):
                     state = 1
                 else:
                     state = 0
-                g.add_metric([upstream, hostname], state)
+                nginx_upstreams.add_metric([upstream, hostname], state)
 
         #  Состояние загрузки данных по финмон
-        f = GaugeMetricFamily("finmon_status", "1/0 = UP/DOWN")
+        finmon = GaugeMetricFamily("finmon_status", "1/0 = UP/DOWN")
         finmon_state = get_finmonstate()
-        f.add_metric([], finmon_state)
+        finmon.add_metric([], finmon_state)
+        #  Кол-во платежей в очереди на фискализацию
+        fiscal = GaugeMetricFamily("processing_fiscalization_queue", 'count')
+        fiscalcount = get_fiscalcount()
+        fiscal.add_metric([], fiscalcount)
 
-        yield f
-        yield g
+        yield finmon
+        yield nginx_upstreams
+        yield fiscal
 
 
 if __name__ == '__main__':
